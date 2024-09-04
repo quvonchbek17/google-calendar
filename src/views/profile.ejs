@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile</title>
+</head>
+<body>
+  <h1>Google Drive Files</h1>
+  <ul>
+    <% files.forEach(file => { %>
+      <li><%= file.name %> (<%= file.id %>)</li>
+    <% }) %>
+  </ul>
+  <a href="/auth/logout">Logout</a>
+</body>
+</html>
