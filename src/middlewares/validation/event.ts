@@ -3,6 +3,7 @@ import Joi from "joi";
 export const createEventDto = Joi.object({
   calendarId: Joi.string().required(),
   addGoogleMeet: Joi.boolean().required(),
+  driveFileIds: Joi.array().items(Joi.string().required()).optional(),
   event: Joi.object({
     summary: Joi.string().optional(),
     location: Joi.string().optional(),
@@ -48,6 +49,7 @@ export const getAllEventsDto = Joi.object({
 export const updateEventDto = Joi.object({
   calendarId: Joi.string().required(),
   eventId: Joi.string().required(),
+  fileIdToRemove: Joi.string().optional(),
   event: Joi.object({
     summary: Joi.string().optional(),
     location: Joi.string().optional(),

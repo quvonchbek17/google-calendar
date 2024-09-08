@@ -1,8 +1,60 @@
 import { Request, Response, NextFunction } from "express";
 import { ErrorHandler } from "@errors";
-import { calendarBuilder } from "@config";
+import { calendarBuilder, driveBuilder } from "@config";
+import * as fs from "fs";
+import path from "path";
 
 export class EventController {
+  static async GetDriveMetaData(
+    driveFileId: string,
+    token: string,
+    next: NextFunction
+  ) {
+    try {
+      const drive = await driveBuilder(token);
+
+      const response = await drive.files.get({
+        fileId: driveFileId,
+        fields: "id, name, mimeType, webViewLink, iconLink",
+      });
+
+      return response.data;
+    } catch (error: any) {
+      next(new ErrorHandler(error.message, error.status));
+    }
+  }
+
+  static async UploadFileToDrive(file: any, token: string, next: NextFunction) {
+    try {
+      const drive = await driveBuilder(token);
+
+      const fileMetadata = {
+        name: file.filename,
+      };
+
+      let filePath = path.join(process.cwd(), "uploads", file.fieldname);
+      const media = {
+        mimeType: file.mimetype,
+        body: fs.createReadStream(filePath),
+      };
+
+      const response = await drive.files.create({
+        requestBody: fileMetadata,
+        media: media,
+      });
+
+      fs.unlinkSync(filePath);
+      let result = await EventController.GetDriveMetaData(
+        response.data?.id as string,
+        token,
+        next
+      );
+      return result;
+    } catch (error: any) {
+      next(new ErrorHandler(error.message, error.status));
+    }
+  }
+
   static async GetAllEvents(
     req: Request,
     res: Response,
@@ -71,17 +123,65 @@ export class EventController {
       const token = req.headers.access_token as string;
       let calendar = await calendarBuilder(token);
 
-      const { calendarId, event, addGoogleMeet  } = req.body;
+      let { calendarId, event, addGoogleMeet, driveFileIds } = req.body;
+      let files = req.files as Express.Multer.File[] | undefined;
+
+      if (typeof event === "string") {
+        event = JSON.parse(event);
+      }
 
       const requestBody: any = {
         ...event,
       };
 
+      let attachments = [];
+
+      if (files) {
+        for (let file of files) {
+          let fileMetadata = await EventController.UploadFileToDrive(
+            file,
+            token,
+            next
+          );
+          if (fileMetadata) {
+            attachments.push({
+              fileId: fileMetadata.id,
+              fileUrl: fileMetadata.webViewLink,
+              title: fileMetadata.name,
+              mimeType: fileMetadata.mimeType,
+              iconLink: fileMetadata.iconLink,
+            });
+          }
+        }
+        requestBody.attachments = attachments;
+      }
+      if (driveFileIds?.length > 0) {
+        for (let driveFileId of driveFileIds) {
+          let fileMetadata = await EventController.GetDriveMetaData(
+            driveFileId,
+            token,
+            next
+          );
+
+          if (fileMetadata) {
+            attachments.push({
+              fileId: driveFileId,
+              fileUrl: fileMetadata.webViewLink,
+              title: fileMetadata.name,
+              mimeType: fileMetadata.mimeType,
+              iconLink: fileMetadata.iconLink,
+            });
+          }
+        }
+
+        requestBody.attachments = attachments;
+      }
+
       if (addGoogleMeet) {
         requestBody.conferenceData = {
           createRequest: {
-            requestId: Math.random().toString(36).substring(2), // Konferensiya uchun unique ID
-            conferenceSolutionKey: { type: "hangoutsMeet" }, // Google Meet biriktirish uchun
+            requestId: Math.random().toString(36).substring(2),
+            conferenceSolutionKey: { type: "hangoutsMeet" },
           },
         };
       }
@@ -89,6 +189,7 @@ export class EventController {
       const result = await calendar.events.insert({
         calendarId: calendarId,
         requestBody,
+        supportsAttachments: attachments.length > 0 ? true : false,
         conferenceDataVersion: addGoogleMeet ? 1 : undefined,
       });
 
@@ -111,7 +212,7 @@ export class EventController {
       const token = req.headers.access_token as string;
       let calendar = await calendarBuilder(token);
 
-      const { calendarId, eventId, event } = req.body;
+      const { calendarId, eventId, event, fileIdToRemove } = req.body;
 
       // Boshlanish va tugash vaqtlarini tekshirish
       if (new Date(event.start?.dateTime) >= new Date(event.end?.dateTime)) {
@@ -123,10 +224,31 @@ export class EventController {
         );
       }
 
+      const eventById = await calendar.events.get({
+        calendarId: calendarId,
+        eventId: eventId,
+      });
+
+      let updatedEvent = {
+        ...event
+      }
+
+      if(eventById.data.attachments){
+        const updatedAttachments = eventById.data.attachments.filter(
+          (attachment: any) => attachment.fileId !== fileIdToRemove
+        );
+
+        updatedEvent = {
+          ...updatedEvent,
+          attachments: updatedAttachments
+        }
+      }
+
       const result = await calendar.events.patch({
         calendarId: calendarId,
         eventId: eventId,
-        requestBody: event,
+        requestBody: updatedEvent,
+        supportsAttachments: fileIdToRemove ? true: false
       });
 
       res.status(200).send({
@@ -232,7 +354,12 @@ export class EventController {
       });
     } catch (error: any) {
       if (error.response && error.response.status === 404) {
-        return next(new ErrorHandler('Calendar or event not found. Please check the IDs and try again.', 404));
+        return next(
+          new ErrorHandler(
+            "Calendar or event not found. Please check the IDs and try again.",
+            404
+          )
+        );
       }
       next(new ErrorHandler(error.message, error.status));
     }
@@ -249,7 +376,7 @@ export class EventController {
 
       const { calendarId, requestBody } = req.body;
 
-      calendar.acl
+      calendar.acl;
 
       const result = await calendar.events.watch({
         calendarId: calendarId,
@@ -258,7 +385,7 @@ export class EventController {
 
       res.status(200).send({
         success: true,
-        message: 'Tadbirlar uchun kuzatish muvaffaqiyatli yoqildi',
+        message: "Tadbirlar uchun kuzatish muvaffaqiyatli yoqildi",
         data: result.data,
       });
     } catch (error: any) {

@@ -224,9 +224,6 @@ export class CalendarsController {
       });
       fs.unlinkSync(filePath);
     } catch (error: any) {
-
-        console.log(error);
-
       next(new ErrorHandler(error.message, error.status));
     }
   }
@@ -295,7 +292,7 @@ export class CalendarsController {
       const token = req.headers.access_token as string;
       let calendar = await calendarBuilder(token);
 
-      const { calendarId, summary, description, timeZone, location } = req.body;
+      const { calendarId, summary, description, timeZone, location  } = req.body;
 
       const result = await calendar.calendars.patch({
         calendarId: calendarId || "primary",
@@ -332,8 +329,6 @@ export class CalendarsController {
         selected,
         hidden,
         summaryOverride,
-        defaultReminders,
-        notificationSettings
       } = req.body;
 
       const result = await calendar.calendarList.patch({

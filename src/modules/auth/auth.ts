@@ -14,7 +14,11 @@ export class AuthController {
       scope: [
         "profile",
         "email",
-        "https://www.googleapis.com/auth/calendar"
+        "https://www.googleapis.com/auth/calendar",
+        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/drive.file",
+        "https://www.googleapis.com/auth/drive.appdata",
+        "https://www.googleapis.com/auth/drive.metadata.readonly"
       ],
       accessType: "offline",
       prompt: "consent",
