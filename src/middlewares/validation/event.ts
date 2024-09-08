@@ -2,6 +2,7 @@ import Joi from "joi";
 
 export const createEventDto = Joi.object({
   calendarId: Joi.string().required(),
+  addGoogleMeet: Joi.boolean().required(),
   event: Joi.object({
     summary: Joi.string().optional(),
     location: Joi.string().optional(),
@@ -96,6 +97,6 @@ export const watchEventsDto = Joi.object({
   requestBody: Joi.object({
     id: Joi.string().required(),
     type: Joi.string().valid("web_hook").required(),
-    address: Joi.string().uri().required(), 
+    address: Joi.string().uri().required(),
   }).required(),
 });

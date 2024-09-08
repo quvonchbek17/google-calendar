@@ -71,11 +71,25 @@ export class EventController {
       const token = req.headers.access_token as string;
       let calendar = await calendarBuilder(token);
 
-      const { calendarId, event } = req.body;
+      const { calendarId, event, addGoogleMeet  } = req.body;
+
+      const requestBody: any = {
+        ...event,
+      };
+
+      if (addGoogleMeet) {
+        requestBody.conferenceData = {
+          createRequest: {
+            requestId: Math.random().toString(36).substring(2), // Konferensiya uchun unique ID
+            conferenceSolutionKey: { type: "hangoutsMeet" }, // Google Meet biriktirish uchun
+          },
+        };
+      }
 
       const result = await calendar.events.insert({
         calendarId: calendarId,
-        requestBody: event,
+        requestBody,
+        conferenceDataVersion: addGoogleMeet ? 1 : undefined,
       });
 
       res.status(200).send({
